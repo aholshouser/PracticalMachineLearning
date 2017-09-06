@@ -1,0 +1,76 @@
+---
+title: "Practical Machine Learning Project"
+output: html_document
+---
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+##Data
+
+###Read Data
+Reading in the data while transforming all errors, blanks, NAs into a consistent output.
+```{r Read Data}
+trn<-read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"), na.strings=c("NA","#DIV/0!",""), header=TRUE)
+tst<-read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"), na.strings=c("NA","#DIV/0!",""), header=TRUE)
+dim(trn)
+dim(tst)
+```
+
+###Cleaning data
+Removing columns which include the NA outputs. The first 7 columns add no prediction value to the model. Removing these columns to added processing efficiency. 
+```{r Cleaning}
+TrnC<-trn[, colSums(is.na(trn)) == 0]
+TrnC<-TrnC[, -c(1:7)]
+TstC<-tst[, colSums(is.na(tst)) == 0]
+TstC<-TstC[, -c(1:7)]
+dim(TrnC)
+dim(TstC)
+```
+
+###Data Segmentation
+Separate the training dataset into training and  validation set. The validation set will provide a out of sample error rate to fine tune the model before applying to the test set. Applied a 70%/30% training to validation dataset ratio.
+```{r data segmentation}
+set.seed(1234)
+library(caret)
+InTrain<-createDataPartition(y=TrnC$classe, p=.70, list=FALSE)
+Training<-TrnC[InTrain,]
+Val<-TrnC[-InTrain,]
+```
+
+##Machine Learning
+### Cross Validation
+The 5-fold cross validation method was used within the decision tree or random forest models.
+```{r cross validation}
+TranFld<-trainControl(method='cv',number=5, savePredictions = TRUE)
+```
+
+###Decision Tree
+```{r decision tree}
+Moddt<-train(classe~.,data=Training, trControl=TranFld, method="rpart")
+Moddt
+Preddt<-predict(Moddt, Val)
+CMdt<-confusionMatrix(Preddt, Val$classe)
+CMdt
+```
+
+Low accuracy at 49% leads to the use for random forest approach.
+
+###Random Forest
+```{r Random Forest}
+ModRmf<-train(classe~.,data=Training, trControl=TranFld, method="rf", ntree=10)
+ModRmf
+PredRmf<-predict(ModRmf, Val)
+CMRmf<-confusionMatrix(PredRmf, Val$classe)
+CMRmf
+```
+
+Accuracy has increased to 99% using a 10 tree random forest. 
+
+###Applied Random Forest on Test set
+```{r test}
+TstRmf<-predict(ModRmf, TstC)
+TstRmf
+```
